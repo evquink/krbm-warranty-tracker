@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KRBM Warranty Tracker</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 100%;
+            padding: 40px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .auth-section {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .auth-section.authenticated {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+        }
+
+        .user-info {
+            color: #155724;
+            font-weight: 500;
+            margin-bottom: 10px;
+        }
+
+        .btn-auth {
+            background: #4285f4;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.2s;
+        }
+
+        .btn-auth:hover {
+            background: #357ae8;
+        }
+
+        .btn-auth:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            color: #333;
+            font-weight: 500;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .form-group label .required {
+            color: #dc3545;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .form-control:disabled {
+            background: #f5f5f5;
+            cursor: not-allowed;
+        }
+
+        select.form-control {
+            cursor: pointer;
+        }
+
+        textarea.form-control {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .btn-submit {
+            width: 100%;
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-submit:hover:not(:disabled) {
+            background: #5568d3;
+        }
+
+        .btn-submit:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .alert {
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            color: #666;
+            font-style: italic;
+            padding: 20px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        @media (max-width: 640px) {
+            .container {
+                padding: 24px;
+            }
+
+            .header h1 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🛠️ Warranty Tracker</h1>
+            <p>Submit warranty and guarantee records</p>
+        </div>
+
+        <!-- Authentication Section (Placeholder) -->
+        <div id="authSection" class="auth-section">
+            <div id="authContent">
+                <p style="color: #666; margin-bottom: 12px;">Authentication coming soon</p>
+                <p style="color: #999; font-size: 12px;">For now, enter your email manually in the form</p>
+            </div>
+        </div>
+
+        <!-- Alert Messages -->
+        <div id="alertContainer"></div>
+
+        <!-- Loading Indicator -->
+        <div id="loading" class="loading">Loading form data...</div>
+
+        <!-- Warranty Entry Form -->
+        <form id="warrantyForm" style="display: none;">
+            <div class="form-group">
+                <label for="date">Date <span class="required">*</span></label>
+                <input type="date" id="date" name="date" class="form-control" required>
+            </div>
+
+            <div class="form-group">
+                <label for="property">Property <span class="required">*</span></label>
+                <input type="text" id="property" name="property" class="form-control" 
+                    list="propertyList" placeholder="Start typing property address..." 
+                    autocomplete="off" required>
+                <datalist id="propertyList">
+                </datalist>
+            </div>
+
+            <div class="form-group">
+                <label for="type">Warranty Type <span class="required">*</span></label>
+                <select id="type" name="type" class="form-control" required>
+                    <option value="">Select a type...</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="description">Item Description <span class="required">*</span></label>
+                <textarea id="description" name="description" class="form-control" 
+                    placeholder="Describe the warranty item or issue..." required></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="amount">Amount <span class="required">*</span></label>
+                <input type="number" id="amount" name="amount" class="form-control" 
+                    step="0.01" min="0" placeholder="0.00" required>
+            </div>
+
+            <div class="form-group">
+                <label for="paymentSource">Payment Source <span class="required">*</span></label>
+                <select id="paymentSource" name="paymentSource" class="form-control" required>
+                    <option value="">Select payment source...</option>
+                    <option value="Out-of-Pocket">Out-of-Pocket</option>
+                    <option value="Fees Waived">Fees Waived</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="createdBy">Your Email <span class="required">*</span></label>
+                <input type="email" id="createdBy" name="createdBy" class="form-control" 
+                    placeholder="your.email@keyrenterbuxmont.com" required>
+            </div>
+
+            <button type="submit" class="btn-submit" id="submitBtn">Submit Warranty Entry</button>
+        </form>
+    </div>
+
+    <script>
+        // Supabase configuration
+        const SUPABASE_URL = 'https://owhzkwwbbvgyuzsmgsho.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_qlSAg00ZjrBo6wMMco3ujw_h-6m-H6d';
+        
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // DOM elements
+        const form = document.getElementById('warrantyForm');
+        const loading = document.getElementById('loading');
+        const alertContainer = document.getElementById('alertContainer');
+        const propertyInput = document.getElementById('property');
+        const propertyDatalist = document.getElementById('propertyList');
+        const typeSelect = document.getElementById('type');
+        const dateInput = document.getElementById('date');
+        const submitBtn = document.getElementById('submitBtn');
+
+        // Store property data for lookup
+        let propertyMap = new Map();
+
+        // Set default date to today
+        dateInput.valueAsDate = new Date();
+
+        // Alert helper functions
+        function showAlert(message, type = 'info') {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type}`;
+            alertDiv.textContent = message;
+            alertContainer.innerHTML = '';
+            alertContainer.appendChild(alertDiv);
+            
+            // Auto-dismiss success messages after 5 seconds
+            if (type === 'success') {
+                setTimeout(() => {
+                    alertDiv.remove();
+                }, 5000);
+            }
+        }
+
+        function clearAlert() {
+            alertContainer.innerHTML = '';
+        }
+
+        // Load properties and warranty types
+        async function loadFormData() {
+            loading.classList.add('active');
+            
+            try {
+                // Load properties
+                const { data: properties, error: propError } = await supabaseClient
+                    .from('properties')
+                    .select('id, address')
+                    .eq('active', true)
+                    .order('address');
+
+                if (propError) throw propError;
+
+                // Populate property datalist and map
+                properties.forEach(property => {
+                    const option = document.createElement('option');
+                    option.value = property.address;
+                    propertyDatalist.appendChild(option);
+                    
+                    // Store address -> id mapping
+                    propertyMap.set(property.address, property.id);
+                });
+
+                // Load warranty types
+                const { data: types, error: typeError } = await supabaseClient
+                    .from('warranty_types')
+                    .select('type_name')
+                    .eq('active', true)
+                    .order('sort_order');
+
+                if (typeError) throw typeError;
+
+                // Populate warranty type dropdown
+                types.forEach(type => {
+                    const option = document.createElement('option');
+                    option.value = type.type_name;
+                    option.textContent = type.type_name;
+                    typeSelect.appendChild(option);
+                });
+
+                // Show form, hide loading
+                loading.classList.remove('active');
+                form.style.display = 'block';
+
+            } catch (error) {
+                loading.classList.remove('active');
+                showAlert('Error loading form data: ' + error.message, 'error');
+                console.error('Error loading form data:', error);
+            }
+        }
+
+        // Handle form submission
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            clearAlert();
+
+            // Disable submit button
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitting...';
+
+            try {
+                // Get property address and look up ID
+                const propertyAddress = propertyInput.value;
+                const propertyId = propertyMap.get(propertyAddress);
+                
+                if (!propertyId) {
+                    throw new Error('Please select a valid property from the list');
+                }
+
+                // Get form values
+                const formData = {
+                    date: document.getElementById('date').value,
+                    property_id: propertyId,
+                    type: document.getElementById('type').value,
+                    item_description: document.getElementById('description').value,
+                    amount: parseFloat(document.getElementById('amount').value),
+                    payment_source: document.getElementById('paymentSource').value,
+                    created_by: document.getElementById('createdBy').value,
+                    modified_by: document.getElementById('createdBy').value
+                };
+
+                // Validate email domain
+                const email = formData.created_by.toLowerCase();
+                if (!email.endsWith('@keyrenterbuxmont.com')) {
+                    throw new Error('Email must be from @keyrenterbuxmont.com domain');
+                }
+
+                // Submit to Supabase
+                const { data, error } = await supabaseClient
+                    .from('warranty_entries')
+                    .insert([formData])
+                    .select();
+
+                if (error) throw error;
+
+                // Success!
+                showAlert('✅ Warranty entry submitted successfully!', 'success');
+                
+                // Reset form
+                form.reset();
+                dateInput.valueAsDate = new Date();
+
+            } catch (error) {
+                showAlert('Error submitting entry: ' + error.message, 'error');
+                console.error('Error submitting entry:', error);
+            } finally {
+                // Re-enable submit button
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Warranty Entry';
+            }
+        });
+
+        // Initialize form on page load
+        loadFormData();
+    </script>
+</body>
+</html>
