@@ -90,6 +90,22 @@
             cursor: not-allowed;
         }
 
+        .btn-signout {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .btn-signout:hover {
+            background: #5a6268;
+        }
+
         .form-group {
             margin-bottom: 20px;
         }
@@ -212,11 +228,10 @@
             <p>Submit warranty and guarantee records</p>
         </div>
 
-        <!-- Authentication Section (Placeholder) -->
+        <!-- Authentication Section -->
         <div id="authSection" class="auth-section">
             <div id="authContent">
-                <p style="color: #666; margin-bottom: 12px;">Authentication coming soon</p>
-                <p style="color: #999; font-size: 12px;">For now, enter your email manually in the form</p>
+                <p style="color: #666; margin-bottom: 12px;">Loading authentication...</p>
             </div>
         </div>
 
@@ -270,12 +285,6 @@
                 </select>
             </div>
 
-            <div class="form-group">
-                <label for="createdBy">Your Email <span class="required">*</span></label>
-                <input type="email" id="createdBy" name="createdBy" class="form-control" 
-                    placeholder="your.email@keyrenterbuxmont.com" required>
-            </div>
-
             <button type="submit" class="btn-submit" id="submitBtn">Submit Warranty Entry</button>
         </form>
     </div>
@@ -291,6 +300,8 @@
         const form = document.getElementById('warrantyForm');
         const loading = document.getElementById('loading');
         const alertContainer = document.getElementById('alertContainer');
+        const authSection = document.getElementById('authSection');
+        const authContent = document.getElementById('authContent');
         const propertyInput = document.getElementById('property');
         const propertyDatalist = document.getElementById('propertyList');
         const typeSelect = document.getElementById('type');
@@ -299,6 +310,7 @@
 
         // Store property data for lookup
         let propertyMap = new Map();
+        let currentUser = null;
 
         // Set default date to today
         dateInput.valueAsDate = new Date();
@@ -321,6 +333,91 @@
 
         function clearAlert() {
             alertContainer.innerHTML = '';
+        }
+
+        // Authentication UI
+        function updateAuthUI(session) {
+            if (session && session.user) {
+                currentUser = session.user;
+                const email = session.user.email;
+                
+                // Check if email is from allowed domain
+                if (!email.endsWith('@keyrenterbuxmont.com')) {
+                    authContent.innerHTML = `
+                        <div class="user-info" style="color: #721c24;">
+                            ⚠️ Unauthorized domain: ${email}
+                        </div>
+                        <p style="color: #721c24; font-size: 13px; margin-bottom: 10px;">
+                            Only @keyrenterbuxmont.com accounts are allowed
+                        </p>
+                        <button class="btn-signout" onclick="signOut()">Sign Out</button>
+                    `;
+                    authSection.className = 'auth-section';
+                    form.style.display = 'none';
+                    return;
+                }
+                
+                authContent.innerHTML = `
+                    <div class="user-info">
+                        ✓ Signed in as ${email}
+                    </div>
+                    <button class="btn-signout" onclick="signOut()">Sign Out</button>
+                `;
+                authSection.className = 'auth-section authenticated';
+                
+                // Load form data if not already loaded
+                if (form.style.display === 'none' && !loading.classList.contains('active')) {
+                    loadFormData();
+                }
+            } else {
+                currentUser = null;
+                authContent.innerHTML = `
+                    <p style="color: #666; margin-bottom: 12px;">Sign in with your KRBM account</p>
+                    <button class="btn-auth" onclick="signInWithGoogle()">
+                        <svg width="18" height="18" xmlns="http://www.w3.org/2000/svg">
+                            <g fill="none" fill-rule="evenodd">
+                                <path d="M17.6 9.2l-.1-1.8H9v3.4h4.8C13.6 12 13 13 12 13.6v2.2h3a8.8 8.8 0 0 0 2.6-6.6z" fill="#4285F4"/>
+                                <path d="M9 18c2.4 0 4.5-.8 6-2.2l-3-2.2a5.4 5.4 0 0 1-8-2.9H1V13a9 9 0 0 0 8 5z" fill="#34A853"/>
+                                <path d="M4 10.7a5.4 5.4 0 0 1 0-3.4V5H1a9 9 0 0 0 0 8l3-2.3z" fill="#FBBC05"/>
+                                <path d="M9 3.6c1.3 0 2.5.4 3.4 1.3L15 2.3A9 9 0 0 0 1 5l3 2.4a5.4 5.4 0 0 1 5-3.7z" fill="#EA4335"/>
+                            </g>
+                        </svg>
+                        Sign in with Google
+                    </button>
+                `;
+                authSection.className = 'auth-section';
+                form.style.display = 'none';
+            }
+        }
+
+        // Sign in with Google
+        async function signInWithGoogle() {
+            try {
+                const { data, error } = await supabaseClient.auth.signInWithOAuth({
+                    provider: 'google',
+                    options: {
+                        redirectTo: window.location.origin
+                    }
+                });
+                
+                if (error) throw error;
+            } catch (error) {
+                showAlert('Error signing in: ' + error.message, 'error');
+                console.error('Error signing in:', error);
+            }
+        }
+
+        // Sign out
+        async function signOut() {
+            try {
+                const { error } = await supabaseClient.auth.signOut();
+                if (error) throw error;
+                
+                // UI will be updated by onAuthStateChange listener
+            } catch (error) {
+                showAlert('Error signing out: ' + error.message, 'error');
+                console.error('Error signing out:', error);
+            }
         }
 
         // Load properties and warranty types
@@ -380,6 +477,12 @@
             e.preventDefault();
             clearAlert();
 
+            // Verify user is still authenticated
+            if (!currentUser || !currentUser.email.endsWith('@keyrenterbuxmont.com')) {
+                showAlert('You must be signed in with a @keyrenterbuxmont.com account', 'error');
+                return;
+            }
+
             // Disable submit button
             submitBtn.disabled = true;
             submitBtn.textContent = 'Submitting...';
@@ -401,15 +504,9 @@
                     item_description: document.getElementById('description').value,
                     amount: parseFloat(document.getElementById('amount').value),
                     payment_source: document.getElementById('paymentSource').value,
-                    created_by: document.getElementById('createdBy').value,
-                    modified_by: document.getElementById('createdBy').value
+                    created_by: currentUser.email,
+                    modified_by: currentUser.email
                 };
-
-                // Validate email domain
-                const email = formData.created_by.toLowerCase();
-                if (!email.endsWith('@keyrenterbuxmont.com')) {
-                    throw new Error('Email must be from @keyrenterbuxmont.com domain');
-                }
 
                 // Submit to Supabase
                 const { data, error } = await supabaseClient
@@ -436,8 +533,16 @@
             }
         });
 
-        // Initialize form on page load
-        loadFormData();
+        // Check authentication state on load
+        supabaseClient.auth.getSession().then(({ data: { session } }) => {
+            updateAuthUI(session);
+        });
+
+        // Listen for auth changes
+        supabaseClient.auth.onAuthStateChange((event, session) => {
+            console.log('Auth event:', event);
+            updateAuthUI(session);
+        });
     </script>
 </body>
 </html>
